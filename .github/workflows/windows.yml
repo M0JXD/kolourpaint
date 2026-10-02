@@ -41,6 +41,7 @@ jobs:
             mingw-w64-ucrt-x86_64-kwidgetsaddons
             mingw-w64-ucrt-x86_64-kxmlgui
             mingw-w64-ucrt-x86_64-kio
+            mingw-w64-ucrt-x86_64-ktextwidgets
     
       - name: Configure CMake
         run: >
