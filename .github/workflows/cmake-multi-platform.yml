@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-${{ steps.strings.outputs.build-output-dir }}
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -75,5 +75,5 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: windows
+        name: ${{ matrix.os }}
         path: ${{ steps.strings.outputs.build-output-dir }}
