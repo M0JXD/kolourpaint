@@ -58,25 +58,6 @@ jobs:
       - name: Install
         run: cmake --install build
 
-      - name: Analyse runtime dependencies
-        shell: msys2 {0}
-        run: |
-          cd "$GITHUB_WORKSPACE/install/bin"
-
-          echo "=== KolourPaint direct dependencies ==="
-          ldd kolourpaint.exe || true
-
-          echo
-          echo "=== All bundled DLLs ==="
-          find . -type f -iname '*.dll' -printf '%f\n' | sort
-
-          echo
-          echo "=== DLL dependency tree ==="
-          for dll in *.dll; do
-            echo "--- $dll ---"
-            ldd "$dll" 2>/dev/null | grep '/ucrt64/bin/' || true
-          done
-    
       - name: Deploy Qt
         run: |
           windeployqt6 \
@@ -89,50 +70,61 @@ jobs:
           set -e
 
           BIN="$GITHUB_WORKSPACE/install/bin"
+          QUEUE="/tmp/kolourpaint-dependency-queue.txt"
+          PROCESSED="/tmp/kolourpaint-dependency-processed.txt"
 
-          # Queue all executables and DLLs currently deployed by CMake/windeployqt.
           find "$BIN" -type f \( -iname '*.exe' -o -iname '*.dll' \) \
-            > /tmp/queue.txt
+            > "$QUEUE"
 
-          > /tmp/processed.txt
+          : > "$PROCESSED"
 
-          while IFS= read -r file; do
-            [ -f "$file" ] || continue
+          INDEX=1
 
-            if grep -Fxq "$file" /tmp/processed.txt; then
+          while true; do
+            TOTAL=$(wc -l < "$QUEUE")
+
+            if [ "$INDEX" -gt "$TOTAL" ]; then
+              break
+            fi
+
+            FILE=$(sed -n "${INDEX}p" "$QUEUE")
+            INDEX=$((INDEX + 1))
+
+            [ -f "$FILE" ] || continue
+
+            if grep -Fxq "$FILE" "$PROCESSED"; then
               continue
             fi
 
-            echo "$file" >> /tmp/processed.txt
-            echo "Scanning $(basename "$file")"
+            echo "$FILE" >> "$PROCESSED"
+            echo "Scanning $(basename "$FILE")"
 
-            deps=$(
-              ldd "$file" 2>/dev/null |
+            while IFS= read -r DEP; do
+              [ -f "$DEP" ] || continue
+
+              NAME="$(basename "$DEP")"
+              DEST="$BIN/$NAME"
+
+              if [ ! -f "$DEST" ]; then
+                echo "  Copying $NAME"
+                cp "$DEP" "$DEST"
+              fi
+
+              if ! grep -Fxq "$DEST" "$PROCESSED" &&
+                 ! grep -Fxq "$DEST" "$QUEUE"; then
+                echo "$DEST" >> "$QUEUE"
+              fi
+
+            done < <(
+              ldd "$FILE" 2>/dev/null |
               sed -n 's/.*=> \(\/ucrt64\/bin\/[^ ]*\.dll\).*/\1/p'
             )
-
-            while IFS= read -r dep; do
-              [ -f "$dep" ] || continue
-
-              name="$(basename "$dep")"
-
-              if [ ! -f "$BIN/$name" ]; then
-                echo "  Copying $name"
-                cp "$dep" "$BIN/$name"
-              fi
-
-              if ! grep -Fxq "$BIN/$name" /tmp/processed.txt &&
-                 ! grep -Fxq "$BIN/$name" /tmp/queue.txt; then
-                echo "$BIN/$name" >> /tmp/queue.txt
-              fi
-            done <<< "$deps"
-
-          done < <(tail -f /tmp/queue.txt)
+          done
 
       - name: Remove development files
         run: |
           rm -rf "$GITHUB_WORKSPACE/install/lib"
-    
+
       - name: Upload installed files
         uses: actions/upload-artifact@v4
         with:
