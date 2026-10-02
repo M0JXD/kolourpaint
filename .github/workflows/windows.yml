@@ -37,12 +37,12 @@ jobs:
             mingw-w64-ucrt-x86_64-kguiaddons
             mingw-w64-ucrt-x86_64-ki18n
             mingw-w64-ucrt-x86_64-kiconthemes
-            mingw-w64-ucrt-x86_64-kcompletion
+            mingw-w64-ucrt-x86_64-ktextwidgets
             mingw-w64-ucrt-x86_64-kwidgetsaddons
             mingw-w64-ucrt-x86_64-kxmlgui
             mingw-w64-ucrt-x86_64-kio
-            mingw-w64-ucrt-x86_64-ktextwidgets
-    
+            mingw-w64-ucrt-x86_64-kdoctools
+
       - name: Configure CMake
         run: >
           cmake -S . -B build
