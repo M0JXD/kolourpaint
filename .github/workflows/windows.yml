@@ -57,17 +57,6 @@ jobs:
     
       - name: Install
         run: cmake --install build
-    
-      - name: Deploy Qt
-        run: |
-          windeployqt6 \
-            --release \
-            --no-translations \
-            "$GITHUB_WORKSPACE/install/bin/kolourpaint.exe"
-    
-      - name: Deploy MSYS2 runtime
-        run: |
-          cp /ucrt64/bin/*.dll "$GITHUB_WORKSPACE/install/bin/"
 
       - name: Analyse runtime dependencies
         shell: msys2 {0}
@@ -87,6 +76,62 @@ jobs:
             echo "--- $dll ---"
             ldd "$dll" 2>/dev/null | grep '/ucrt64/bin/' || true
           done
+    
+      - name: Deploy Qt
+        run: |
+          windeployqt6 \
+            --release \
+            --no-translations \
+            "$GITHUB_WORKSPACE/install/bin/kolourpaint.exe"
+
+      - name: Deploy required MSYS2 runtime DLLs
+        run: |
+          set -e
+
+          BIN="$GITHUB_WORKSPACE/install/bin"
+
+          # Queue all executables and DLLs currently deployed by CMake/windeployqt.
+          find "$BIN" -type f \( -iname '*.exe' -o -iname '*.dll' \) \
+            > /tmp/queue.txt
+
+          > /tmp/processed.txt
+
+          while IFS= read -r file; do
+            [ -f "$file" ] || continue
+
+            if grep -Fxq "$file" /tmp/processed.txt; then
+              continue
+            fi
+
+            echo "$file" >> /tmp/processed.txt
+            echo "Scanning $(basename "$file")"
+
+            deps=$(
+              ldd "$file" 2>/dev/null |
+              sed -n 's/.*=> \(\/ucrt64\/bin\/[^ ]*\.dll\).*/\1/p'
+            )
+
+            while IFS= read -r dep; do
+              [ -f "$dep" ] || continue
+
+              name="$(basename "$dep")"
+
+              if [ ! -f "$BIN/$name" ]; then
+                echo "  Copying $name"
+                cp "$dep" "$BIN/$name"
+              fi
+
+              if ! grep -Fxq "$BIN/$name" /tmp/processed.txt &&
+                 ! grep -Fxq "$BIN/$name" /tmp/queue.txt; then
+                echo "$BIN/$name" >> /tmp/queue.txt
+              fi
+            done <<< "$deps"
+
+          done < <(tail -f /tmp/queue.txt)
+
+      - name: Remove development files
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/install/lib"
     
       - name: Upload installed files
         uses: actions/upload-artifact@v4
