@@ -42,6 +42,7 @@ jobs:
             mingw-w64-ucrt-x86_64-kxmlgui
             mingw-w64-ucrt-x86_64-kio
             mingw-w64-ucrt-x86_64-kdoctools
+            mingw-w64-ucrt-x86_64-icoutils
 
       - name: Configure CMake
         run: >
@@ -67,6 +68,25 @@ jobs:
       - name: Deploy MSYS2 runtime
         run: |
           cp /ucrt64/bin/*.dll "$GITHUB_WORKSPACE/install/bin/"
+
+      - name: Analyse runtime dependencies
+        shell: msys2 {0}
+        run: |
+          cd "$GITHUB_WORKSPACE/install/bin"
+
+          echo "=== KolourPaint direct dependencies ==="
+          ldd kolourpaint.exe || true
+
+          echo
+          echo "=== All bundled DLLs ==="
+          find . -type f -iname '*.dll' -printf '%f\n' | sort
+
+          echo
+          echo "=== DLL dependency tree ==="
+          for dll in *.dll; do
+            echo "--- $dll ---"
+            ldd "$dll" 2>/dev/null | grep '/ucrt64/bin/' || true
+          done
     
       - name: Upload installed files
         uses: actions/upload-artifact@v4
