@@ -1,3 +1,10 @@
+# Windows Build of Kolourpaint
+
+This repo contains the a GitHub workflow to build a Windows version of Kolourpaint.
+Mainly attempted to test, but there are other issues with opening files etc..
+Archived so someone else can pick it up if they like.
+
+---
 
 https://apps.kde.org/kolourpaint/
 
